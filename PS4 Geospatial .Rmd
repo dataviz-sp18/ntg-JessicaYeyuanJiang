@@ -1,0 +1,166 @@
+---
+title: "Assignment 4: Geospatial visualization"
+author: "Jessica Jiang"
+date: "5/27/2018"
+output: html_document
+graphics: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, comment = NA, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(haven)
+library(ggmap)
+library(data.table)
+library(ggplot2)
+library(tidyverse)
+library(knitr)
+library(dplyr)
+library(grid)
+library(magick)
+library(magrittr)
+library(png)
+library(ri)
+```
+
+
+```{r}
+################
+#  clean data  #
+################
+
+#read in data
+data_folder = "~/Desktop/class spring18/dataViz/fp"
+DT <- as.data.table(read.csv(paste0(data_folder,"/assignment4.csv")))
+
+#remove age higer than 100 because of too few observations
+DT <- DT[age<=100, ]
+
+#recode age to 20 age groups(1,2,3,...,20) by interval = 5
+upper = 0
+for (i in 1:20){
+  DT[age >= upper ,  age_range := i]
+  upper = upper + 5
+}
+
+#recode numerical age groups to chategorical
+DT$age_range <- as.factor(DT$age_range)
+levels(DT$age_range) <- c("0-4","5-9","10-14","15-19","20-24","25-29",
+                          "30-34","34-39","40-44","45-49","50-54",
+                          "55-59", "60-64","65-69", "70-74","75-79",
+                          "80-84","85-89","90-94","95-100")
+
+#recode state code to state name
+DT$state <- as.character(DT$state)
+DT$state <- recode(DT$state, 
+                   "1" = "Aguascalientes",
+                   "2" = "Baja California",
+                   "3" = "Baja California Sur",
+                   "4" = "Campeche",
+                   "5" = "Coahuila",
+                   "6" = "Colima",
+                   "7" = "Chiapas",
+                   "8" = "Coahuila",
+                   "9" = "Ciudad de Mexico",
+                   "10" = "Durango",
+                   "11" = "Guanajuato",
+                   "12" = "Guerrero",
+                   "13" = "Hidalgo",
+                   "14" = "Jalisco",
+                   "15" = "Mexico",
+                   "16" = "Michoacan",
+                   "17" = "Morelos",
+                   "18" = "Nayarit",
+                   "19" = "Nuevo Leon",
+                   "20" = "Oaxaca",
+                   "21" = "Puebla",
+                   "22" = "Queretaro",
+                   "23" = "Quintana Roo",
+                   "24" = "San Luis Potosi",
+                   "25" = "Sinaloa",
+                   "26" = "Sonora",
+                   "27" = "Tabasco",
+                   "28" = "Tamaulipas",
+                   "29" = "Tlaxcala",
+                   "30" = "Veracruz",
+                   "31" = "Yucatan",
+                   "32" = "Zacatecas"
+                   )
+
+
+#State geospatial lat and lon
+DT[,lat:=0]
+DT[,lon:=0]
+
+DT[state =="Aguascalientes"  ,    c("lat","lon") := list(21.87945992 , -102.2904135)]   
+DT[state =="Baja California" ,    c("lat","lon") := list(30.76405113 , -116.0092603)] 
+DT[state =="Baja California Sur", c("lat","lon") := list(26.01333335 , -111.3516635)]   
+DT[state =="Campeche" ,           c("lat","lon") := list(18.65365928 , -91.82448019)]   
+DT[state =="Coahuila",            c("lat","lon") := list(28.32998781 , -100.8499789)]   
+DT[state =="Colima",              c("lat","lon") := list(18.92038129 , -103.8799748)]   
+DT[state =="Chiapas",             c("lat","lon") := list(16.74999697 , -92.63337447)]  
+DT[state =="Coahuila" ,           c("lat","lon") := list(26.93335472 , -105.6666358)]   
+DT[state =="Ciudad de Mexico",    c("lat","lon") := list(19.41001548 , -99.02998661)]   
+DT[state =="Durango",             c("lat","lon") := list(25.57005292 , -103.5000238)]
+DT[state =="Guanajuato",          c("lat","lon") := list(20.67001609 , -101.4999909)]
+DT[state =="Guerrero",            c("lat","lon") := list(17.54997398 , - 99.5000096)] 
+DT[state =="Hidalgo",             c("lat","lon") := list(20.17043418 , -98.73003076)]  
+DT[state =="Jalisco",             c("lat","lon") := list(19.77001935 , -104.3699966)]  
+DT[state =="Mexico",              c("lat","lon") := list(19.41001548 , -99.02998661)]   
+DT[state =="Michoacan",           c("lat","lon") := list(19.67997316 , -100.569996 )]
+DT[state =="Morelos",             c("lat","lon") := list(18.92110476 , -99.23999964)]
+DT[state =="Nayarit",             c("lat","lon") := list(21.81999758 , -105.2200481)] 
+DT[state =="Nuevo Leon",          c("lat","lon") := list(25.1899986  , -99.83998885)]  
+DT[state =="Oaxaca",              c("lat","lon") := list(16.42999066 , -95.01999882)] 
+DT[state =="Puebla",              c("lat","lon") := list(18.90002077 , -98.44999618)]
+DT[state =="Queretaro",           c("lat","lon") := list(20.37998212 , -100.0000308)] 
+DT[state =="Quintana Roo",        c("lat","lon") := list(21.20839057 , -86.7114549 )]   
+DT[state =="San Luis Potosi",     c("lat","lon") := list(22.00001243 , -99.66999923)] 
+DT[state =="Sinaloa",             c("lat","lon") := list(23.19999086 , -106.2300381)]   
+DT[state =="Sonora",              c("lat","lon") := list(27.58000775 , -109.9299931)] 
+DT[state =="Tabasco",             c("lat","lon") := list(18.40002545,  -93.22997888)]
+DT[state =="Tamaulipas",          c("lat","lon") := list(22.73335268 , -98.95001734)] 
+DT[state =="Tlaxcala",            c("lat","lon") := list(19.31999514,  -98.2300096 )] 
+DT[state =="Veracruz",            c("lat","lon") := list(17.93997601 , -94.73999007)]  
+DT[state =="Yucatan",             c("lat","lon") := list(21.09998985 , -89.27998743)]   
+DT[state =="Zacatecas",           c("lat","lon") := list(22.35001691,  -102.88001  )]
+
+
+DT <- DT[,c("state","sex", "age", "education", "bmi", "age_range", "lat", "lon")]
+DT <- DT[, .(bmi_mean = mean(bmi, na.rm = TRUE)), by = c("state", "lat", "lon", "sex")]
+
+#spread the data set by gender
+DT <- spread(DT, sex, bmi_mean)
+
+DT$female <- as.numeric(DT$female)
+DT$male <- as.numeric(DT$male)
+```
+
+
+```{r}
+library(leaflet)
+
+#define tab
+DT[, tab := paste0("In ", state,", the average bmi of female is ", round(DT$female, 2), 
+                   ", and the average bmi of male is ",round(DT$male, 2))]
+
+Map <-
+leaflet(DT) %>% 
+  addTiles() %>% 
+  addMarkers(lng=DT$lon, lat=DT$lat, popup = DT$tab, clusterOptions = markerClusterOptions())
+
+Map
+```
+
+
+
+
+
+
+
+
+
+
+
